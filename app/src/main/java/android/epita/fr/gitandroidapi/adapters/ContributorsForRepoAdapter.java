@@ -3,6 +3,7 @@ package android.epita.fr.gitandroidapi.adapters;
 import android.content.Context;
 import android.epita.fr.gitandroidapi.R;
 import android.epita.fr.gitandroidapi.models.ContributorsForRepo;
+import android.epita.fr.gitandroidapi.sessionsfunctions.Functions;
 import android.support.annotation.NonNull;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -76,8 +77,12 @@ public class ContributorsForRepoAdapter extends ArrayAdapter<ContributorsForRepo
 
 
         holder.contributor_name.setText(contriName);
-        Glide.with(mContext).load(avatar).into(holder.avatar);
+        if(Functions.isInternetAvailable(mContext))
+            Glide.with(mContext).load(avatar).into(holder.avatar);
+        else
+            holder.avatar.setImageResource(R.drawable.ic_launcher_background);
 
         return convertView;
     }
+
 }

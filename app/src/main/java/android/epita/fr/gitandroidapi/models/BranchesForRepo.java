@@ -1,7 +1,14 @@
 package android.epita.fr.gitandroidapi.models;
 
-public class BranchesForRepo
+import io.realm.RealmObject;
+
+public class BranchesForRepo extends RealmObject
 {
+    public BranchesForRepo()
+    {
+
+    }
+
     private String name;
 
     public BranchesForRepo(String branchName) {

@@ -1,6 +1,8 @@
 package android.epita.fr.gitandroidapi.models;
 
-public class Repository
+import io.realm.RealmObject;
+
+public class Repository extends RealmObject
 {
         private String name;
         private String description;
@@ -9,6 +11,11 @@ public class Repository
 
         private String branches_url;
         private String contributors_url;
+
+        public Repository()
+        {
+
+        }
 
         public Repository(String name, String description, String language, String counts,String branches_url,String contributors_url) {
             this.name = name;

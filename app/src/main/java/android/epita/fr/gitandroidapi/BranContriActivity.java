@@ -6,14 +6,20 @@ import android.epita.fr.gitandroidapi.adapters.ContributorsForRepoAdapter;
 import android.epita.fr.gitandroidapi.interfaces.GitHubClient;
 import android.epita.fr.gitandroidapi.models.BranchesForRepo;
 import android.epita.fr.gitandroidapi.models.ContributorsForRepo;
+import android.epita.fr.gitandroidapi.models.Repository;
+import android.epita.fr.gitandroidapi.sessionsfunctions.Functions;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.ListView;
 
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
 
+import io.realm.Realm;
+import io.realm.RealmConfiguration;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -29,13 +35,17 @@ public class BranContriActivity extends AppCompatActivity {
     private String branchUrl;
     private String contributorUrl;
     GitHubClient client;
-    ArrayList<BranchesForRepo> branches;
 
+    ArrayList<BranchesForRepo> realmBasedRepoBranch;
+    ArrayList<ContributorsForRepo> realmBasedRepoContri;
     private BranchForRepoAdapter adapter;
     ListView branchLv;
 
     private ContributorsForRepoAdapter contriAdapter;
     ListView contriLv;
+
+    Realm realm;
+    RealmConfiguration config;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,19 +57,36 @@ public class BranContriActivity extends AppCompatActivity {
 
         fromMainActivity=getIntent();
 
+        //Retro init
         Retrofit.Builder builder = new Retrofit.Builder()
                 .baseUrl(BASE_URL)
                 .addConverterFactory(GsonConverterFactory.create());
         Retrofit retrofit = builder.build();
         client = retrofit.create(GitHubClient.class);
 
+        //Realm
+        //Init Realm
+
+        config = new RealmConfiguration.Builder()
+                .name("default2")
+                .schemaVersion(3)
+                .deleteRealmIfMigrationNeeded()
+                .build();
+
+        realm = Realm.getInstance(config);
+
         branchUrl=fromMainActivity.getStringExtra(BRANCH_URL_FOR_INTENT);
 
         contributorUrl=fromMainActivity.getStringExtra(CONTRIBUTOR_URL_FOR_INTENT);
 
-        getBranches();
-
-        getContributors();
+        if(Functions.isInternetAvailable(getApplicationContext())) {
+            getBranches();
+            getContributors();
+        }
+        else {
+            onSearchOfThisOfflineBranch();
+            onSearchOfThisOfflineContributors();
+        }
     }
 
     private void getBranches()
@@ -73,9 +100,17 @@ public class BranContriActivity extends AppCompatActivity {
                 if (response.isSuccessful()) {
                     if (response.body() != null) {
 
+                        realm.beginTransaction();
+
                         ArrayList<BranchesForRepo> jsonresponse = (ArrayList<BranchesForRepo>) response.body();
+
+                        realm.insertOrUpdate(jsonresponse);
+                        realm.commitTransaction();
+
                         adapter = new BranchForRepoAdapter(BranContriActivity.this,  R.layout.list_view_branches, jsonresponse);
                         branchLv.setAdapter(adapter);
+
+
                     }
                     else
                     {
@@ -107,7 +142,13 @@ public class BranContriActivity extends AppCompatActivity {
                 if (response.isSuccessful()) {
                     if (response.body() != null) {
 
+                        realm.beginTransaction();
+
                         ArrayList<ContributorsForRepo> jsonresponse = (ArrayList<ContributorsForRepo>) response.body();
+
+                        realm.insertOrUpdate(jsonresponse);
+                        realm.commitTransaction();
+
                         contriAdapter = new ContributorsForRepoAdapter(BranContriActivity.this,  R.layout.list_view_contributors, jsonresponse);
                         contriLv.setAdapter(contriAdapter);
                     }
@@ -128,5 +169,41 @@ public class BranContriActivity extends AppCompatActivity {
             public void onFailure(Call<List<ContributorsForRepo>> call, Throwable t) {
             }
         });
+    }
+
+    private void onSearchOfThisOfflineBranch()
+    {
+        realmBasedRepoBranch = (ArrayList<BranchesForRepo>) realm.copyFromRealm(realm.where(BranchesForRepo.class).findAll());
+
+        if(!realmBasedRepoBranch.isEmpty()) {
+            for (int j=0;j<realmBasedRepoBranch.size();j++)
+                Log.d("CRYMAN", realmBasedRepoBranch.get(j).getName() + "");
+        }
+        else
+        {
+            Log.d("CRYMAN", "is empty , literally" + "");
+        }
+
+        adapter = new BranchForRepoAdapter(BranContriActivity.this,  R.layout.list_view_branches, realmBasedRepoBranch);
+        branchLv.setAdapter(adapter);
+
+    }
+
+    private void onSearchOfThisOfflineContributors()
+    {
+        realmBasedRepoContri = (ArrayList<ContributorsForRepo>) realm.copyFromRealm(realm.where(ContributorsForRepo.class).findAll());
+
+        if(!realmBasedRepoContri.isEmpty()) {
+            for (int j=0;j<realmBasedRepoContri.size();j++)
+                Log.d("CRYMAN", realmBasedRepoContri.get(j).getLogin() + "");
+        }
+        else
+        {
+            Log.d("CRYMAN", "is empty , literally" + "");
+        }
+
+        contriAdapter = new ContributorsForRepoAdapter(BranContriActivity.this,  R.layout.list_view_contributors, realmBasedRepoContri);
+        contriLv.setAdapter(contriAdapter);
+
     }
 }

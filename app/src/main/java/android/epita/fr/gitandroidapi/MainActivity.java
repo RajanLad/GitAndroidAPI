@@ -1,9 +1,11 @@
 package android.epita.fr.gitandroidapi;
 
+import android.content.Context;
 import android.content.Intent;
 import android.epita.fr.gitandroidapi.adapters.GitRepoAdapter;
 import android.epita.fr.gitandroidapi.interfaces.GitHubClient;
 import android.epita.fr.gitandroidapi.models.Repository;
+import android.net.ConnectivityManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.Editable;
@@ -19,9 +21,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.realm.Realm;
+import io.realm.RealmConfiguration;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -38,11 +43,15 @@ public class MainActivity extends AppCompatActivity
     private static String CONTRIBUTOR_URL_FOR_INTENT="contributor_url";
 
     ArrayList<Repository> repos;
+    ArrayList<Repository> realmBasedRepo;
     GitHubClient client;
     Intent brancontri;
     ListView lv;
     EditText ed;
     private GitRepoAdapter adapter;
+
+    Realm realm;
+    RealmConfiguration config;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,21 +61,46 @@ public class MainActivity extends AppCompatActivity
         lv = (ListView)findViewById(R.id.listOfGit);
         ed = (EditText)findViewById(R.id.searchThem);
 
+        repos = new ArrayList<>();
 
+        //Retro init
         Retrofit.Builder builder = new Retrofit.Builder()
                 .baseUrl(BASE_URL)
                 .addConverterFactory(ScalarsConverterFactory.create());
         Retrofit retrofit = builder.build();
         client = retrofit.create(GitHubClient.class);
 
+        //Realm
+        //Init Realm
+        // Initialize Realm (just once per application)
+        Realm.init(getApplicationContext());
+
+
+
+        config = new RealmConfiguration.Builder()
+                .name("default2")
+                .schemaVersion(3)
+                .deleteRealmIfMigrationNeeded()
+                .build();
+
+        realm = Realm.getInstance(config);
+
         lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                if(!repos.isEmpty())
-                    brancontri=new Intent(MainActivity.this,BranContriActivity.class);
-                    brancontri.putExtra(BRANCH_URL_FOR_INTENT,repos.get(i).getBranches_url().replace("{/branch}",""));
-                    brancontri.putExtra(CONTRIBUTOR_URL_FOR_INTENT,repos.get(i).getContributors_url());
+                if(!repos.isEmpty()) {
+                    brancontri = new Intent(MainActivity.this, BranContriActivity.class);
+                    brancontri.putExtra(BRANCH_URL_FOR_INTENT, repos.get(i).getBranches_url().replace("{/branch}", ""));
+                    brancontri.putExtra(CONTRIBUTOR_URL_FOR_INTENT, repos.get(i).getContributors_url());
                     startActivity(brancontri);
+                }
+                else if(!realmBasedRepo.isEmpty())
+                {
+                    brancontri = new Intent(MainActivity.this, BranContriActivity.class);
+                    brancontri.putExtra(BRANCH_URL_FOR_INTENT, realmBasedRepo.get(i).getBranches_url().replace("{/branch}", ""));
+                    brancontri.putExtra(CONTRIBUTOR_URL_FOR_INTENT, realmBasedRepo.get(i).getContributors_url());
+                    startActivity(brancontri);
+                }
             }
         });
 
@@ -78,7 +112,14 @@ public class MainActivity extends AppCompatActivity
 
             @Override
             public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                onSearchOfThis(charSequence.toString());
+
+                if(isInternetAvailable()) {
+                    onSearchOfThis(charSequence.toString());
+                }
+                else
+                {
+                    onSearchOfThisOffline(charSequence.toString());
+                }
             }
 
             @Override
@@ -103,8 +144,8 @@ public class MainActivity extends AppCompatActivity
                     if (response.body() != null) {
 
                         String jsonresponse = response.body().toString();
-                        //Toast.makeText(MainActivity.this, jsonresponse.toString(), Toast.LENGTH_SHORT).show();
                         decodeToAdapter(jsonresponse);
+
 
                         (MainActivity.this).adapter.getFilter().filter(search);
                         adapter.notifyDataSetChanged();
@@ -133,7 +174,11 @@ public class MainActivity extends AppCompatActivity
         try {
             //getting the whole json object from the response
             JSONObject obj = new JSONObject(response);
+
+
             if(true){
+
+                realm.beginTransaction();
 
                 ArrayList<Repository> retroModelArrayList = new ArrayList<>();
                 JSONArray dataArray  = obj.getJSONArray("items");
@@ -150,13 +195,17 @@ public class MainActivity extends AppCompatActivity
                     retroModel.setBranches_url(dataobj.getString("branches_url"));
                     retroModel.setContributors_url(dataobj.getString("contributors_url"));
                     retroModelArrayList.add(retroModel);
-
                 }
 
 
                 repos = retroModelArrayList;
+
+                realm.insertOrUpdate(repos);
+
                 adapter = new GitRepoAdapter(MainActivity.this,  R.layout.list_view, repos);
                 lv.setAdapter(adapter);
+
+                realm.commitTransaction();
 
             }else {
                 Toast.makeText(MainActivity.this, obj.optString("message")+" ", Toast.LENGTH_SHORT).show();
@@ -166,5 +215,34 @@ public class MainActivity extends AppCompatActivity
             e.printStackTrace();
         }
 
+        finally
+        {
+            //realm.close();
+        }
+
+    }
+
+    public boolean isInternetAvailable() {
+        ConnectivityManager cm =
+                (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        return cm.getActiveNetworkInfo() != null &&
+                cm.getActiveNetworkInfo().isConnectedOrConnecting();
+    }
+
+    private void onSearchOfThisOffline(String search)
+    {
+        realmBasedRepo = (ArrayList<Repository>) realm.copyFromRealm(realm.where(Repository.class).findAll());
+
+//        if(!realmBasedRepo.isEmpty()) {
+//            for (int j=0;j<realmBasedRepo.size();j++)
+//                Log.d("CRYMAN", realmBasedRepo.get(j).getName() + "");
+//        }
+
+        adapter = new GitRepoAdapter(MainActivity.this,  R.layout.list_view, realmBasedRepo);
+        lv.setAdapter(adapter);
+
+        (MainActivity.this).adapter.getFilter().filter(search);
+        adapter.notifyDataSetChanged();
     }
 }

@@ -1,7 +1,14 @@
 package android.epita.fr.gitandroidapi.models;
 
-public class ContributorsForRepo
+import io.realm.RealmObject;
+
+public class ContributorsForRepo extends RealmObject
 {
+    void ContributorsForRepo()
+    {
+
+    }
+
     private String login;
     private String avatar_url;
 

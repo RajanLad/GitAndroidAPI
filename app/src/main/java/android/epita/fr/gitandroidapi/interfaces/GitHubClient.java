@@ -20,14 +20,15 @@ public interface GitHubClient {
     @GET("/search/repositories")
     Call<String> reposBySearch(@Query("q") String name);
 
-    //    //https://api.github.com/repos/Moya/Moya/branches
-    //
-    //    //https://api.github.com/repos/Moya/Moya/contributors
-
     @GET
     Call<List<BranchesForRepo>> getBranchesForTheRepo(@Url String url);
 
     @GET
     Call<List<ContributorsForRepo>> getContributorsForTheRepo(@Url String url);
+
+    //https://api.github.com/repositories?since=364
+
+    @GET("/repositories")
+    Call<List<Repository>> getReposForOffline(@Query("since") int since);
 
 }
